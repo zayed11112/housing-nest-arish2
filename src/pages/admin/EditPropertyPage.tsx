@@ -82,28 +82,12 @@ const EditPropertyPage: React.FC = () => {
     
     console.log("معرف العقار المطلوب تعديله:", id);
     console.log("نوع معرف العقار:", typeof id);
-    console.log("قائمة العقارات المتاحة:", properties.map(p => ({ id: p.id, name: p.name, idType: typeof p.id })));
     
     // تحويل المعرف إلى نص للتأكد من تطابق نوع البيانات عند المقارنة
     const propertyId = String(id);
     
-    // محاولة البحث بطرق مختلفة للتأكد من العثور على العقار
-    let property = properties.find((p) => String(p.id) === propertyId);
-    
-    if (!property) {
-      // محاولة ثانية باستخدام المقارنة المباشرة
-      property = properties.find((p) => p.id === id);
-      console.log("محاولة البحث بالمقارنة المباشرة:", property ? "تم العثور على العقار" : "لم يتم العثور على العقار");
-    }
-    
-    if (!property) {
-      // محاولة ثالثة باستخدام تحويل المعرف إلى رقم إذا كان ذلك ممكنًا
-      const numericId = !isNaN(Number(id)) ? Number(id) : null;
-      if (numericId !== null) {
-        property = properties.find((p) => Number(p.id) === numericId);
-        console.log("محاولة البحث بتحويل المعرف إلى رقم:", property ? "تم العثور على العقار" : "لم يتم العثور على العقار");
-      }
-    }
+    // البحث عن العقار باستخدام المعرف النصي
+    const property = properties.find((p) => String(p.id) === propertyId);
     
     console.log("العقار الذي تم العثور عليه:", property);
     
@@ -378,16 +362,20 @@ const EditPropertyPage: React.FC = () => {
       console.log('معرف العقار بعد التحويل إلى نص:', propertyId);
       
       // محاولة تحديث العقار
-      await updateProperty(propertyId, updateData);
+      const success = await updateProperty(propertyId, updateData);
       
-      toast({
-        title: "تم تحديث العقار بنجاح"
-      });
-      
-      // تأخير قليل قبل الانتقال للتأكد من ظهور رسالة النجاح
-      setTimeout(() => {
-        navigate("/admin/properties");
-      }, 500);
+      if (success) {
+        toast({
+          title: "تم تحديث العقار بنجاح"
+        });
+        
+        // تأخير قليل قبل الانتقال للتأكد من ظهور رسالة النجاح
+        setTimeout(() => {
+          navigate("/admin/properties");
+        }, 500);
+      } else {
+        throw new Error("فشل تحديث العقار لسبب غير معروف");
+      }
       
     } catch (error) {
       console.error('خطأ في تحديث العقار:', error);
