@@ -1,3 +1,5 @@
+
+>>>>>>> 09e533c2d25ed4d97fa8083e1dc0b971fd21a5d4
 # Housing Nest Arish Project
 
 ## Project info
@@ -61,3 +63,6 @@ You can deploy this project using various hosting providers like Netlify, Vercel
 ## I want to use a custom domain - is that possible?
 
 Yes, most hosting providers allow you to configure a custom domain for your deployed project. Refer to your chosen provider's documentation for instructions.
+=======
+
+>>>>>>> 09e533c2d25ed4d97fa8083e1dc0b971fd21a5d4
