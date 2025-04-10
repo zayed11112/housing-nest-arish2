@@ -7,10 +7,10 @@ import React, {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthChangeEvent, AuthError, Session, User } from "@supabase/supabase-js";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
 import { toast } from "sonner";
 import { UserRole, Faculty, UserStatus } from '@/types'; // Ensure UserStatus is imported
-import { ProfilesRow } from '@/types/database';
+import { ProfilesRow, Database } from '@/types/database'; // Import Database type
 import { PostgrestError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 
@@ -22,12 +22,12 @@ interface LocalUser {
   role: UserRole;
   status: UserStatus; // Add status field
   name?: string;
-  student_id?: string;
+  // student_id?: string; // Removed, not in profiles table
   faculty?: string;
   batch?: string;
-  phone?: string;
+  // phone?: string; // Removed, not in profiles table
   avatar_url?: string;
-  created_at: string;
+  // created_at: string; // Removed, not in profiles table (use updated_at)
   updated_at: string;
   last_login: string;
 }
@@ -45,16 +45,16 @@ export interface AuthContextType {
     email: string,
     password: string,
     name?: string,
-    student_id?: string,
+    // student_id?: string, // Removed
     faculty?: string,
     batch?: string
   ) => Promise<any>;
   updateProfile: (
     full_name?: string,
-    student_id?: string,
+    // student_id?: string, // Removed
     faculty?: string,
     batch?: string,
-    phone?: string,
+    // phone?: string, // Removed
     avatar_url?: string | null
   ) => Promise<any>;
   getAllUsers: () => Promise<ProfilesRow[]>;
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isConnected, setIsConnected] = useState(true);
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const { toast: uiToast } = useToast();
+  // Removed uiToast declaration
 
   const getLocalUserData = (): LocalUser | null => {
     const userData = localStorage.getItem("housing_nest_user");
@@ -120,12 +120,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         status: (profileData.status as UserStatus) || 'active', // Add status handling
         fullName: profileData.full_name || "",
         name: profileData.full_name || "",
-        student_id: profileData.student_id || undefined,
+        // student_id: profileData.student_id || undefined, // Removed
         faculty: profileData.faculty || undefined,
         batch: profileData.batch || undefined,
-        phone: profileData.phone || undefined,
+        // phone: profileData.phone || undefined, // Removed
         avatar_url: profileData.avatar_url || undefined,
-        created_at: profileData.created_at || new Date().toISOString(),
+        // created_at: profileData.created_at || new Date().toISOString(), // Removed
         updated_at: profileData.updated_at || new Date().toISOString(),
         last_login: new Date().toISOString(),
       };
@@ -197,19 +197,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const login = async (emailOrId: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      let userEmail = emailOrId;
-      if (!emailOrId.includes('@')) {
-        const { data: profilesArray, error: profileError } = await supabase
-          .from("profiles")
-          .select("email")
-          .eq("student_id", emailOrId);
-
-        if (profileError) throw new Error("خطأ أثناء البحث عن المستخدم");
-        if (!profilesArray || profilesArray.length !== 1 || !profilesArray[0].email) {
-          throw new Error("لم يتم العثور على مستخدم بهذا المعرف أو الملف الشخصي غير مكتمل");
-        }
-        userEmail = profilesArray[0].email;
-      }
+      // Simplified login logic: Assumes emailOrId is always email for now,
+      // as fetching email based on student_id from profiles is not possible with current schema.
+      // If login via student_id is required, the database schema or this logic needs adjustment.
+      const userEmail = emailOrId;
+      // The block attempting to fetch email by student_id was removed as 'email' and 'student_id' aren't in profiles.
 
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: userEmail,
@@ -282,22 +274,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Register User function
   const registerUser = async (
-    email: string, password: string, name?: string, student_id?: string, faculty?: string, batch?: string
+    email: string, password: string, name?: string, /* student_id?: string, */ faculty?: string, batch?: string // Removed student_id
   ) => {
     try {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
       if (!data.user) throw new Error("لم يتم إنشاء المستخدم");
 
-      const profileData: Partial<ProfilesRow> = {
-        id: data.user.id,
+      // Explicitly use the Insert type for profileData
+      const profileData: Database['public']['Tables']['profiles']['Insert'] = {
+        id: data.user.id, // Required by Insert type
         full_name: name?.trim() || null,
-        email: email || null,
-        role: "user",
+        role: "user", // Default role
         status: 'active', // Default status
-        student_id: student_id?.trim() || null,
         faculty: faculty?.trim() || null,
         batch: batch?.trim() || null,
+        // Explicitly exclude other fields not in Insert type like username, avatar_url, website, updated_at
       };
 
       const { error: profileError } = await supabase.from("profiles").insert(profileData);
@@ -314,7 +306,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Update Profile function
   const updateProfile = async (
-    full_name?: string, student_id?: string, faculty?: string, batch?: string, phone?: string, avatar_url?: string | null
+    full_name?: string, /* student_id?: string, */ faculty?: string, batch?: string, /* phone?: string, */ avatar_url?: string | null // Removed student_id, phone
   ) => {
     if (!currentUser?.id) {
       toast.error("يجب تسجيل الدخول لتحديث الملف الشخصي");
@@ -323,10 +315,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const profileUpdates: Partial<ProfilesRow> = { updated_at: new Date().toISOString() };
       if (full_name !== undefined) profileUpdates.full_name = full_name.trim() || null;
-      if (student_id !== undefined) profileUpdates.student_id = student_id.trim() || null;
+      // if (student_id !== undefined) profileUpdates.student_id = student_id.trim() || null; // Removed
       if (faculty !== undefined) profileUpdates.faculty = faculty.trim() || null;
       if (batch !== undefined) profileUpdates.batch = batch.trim() || null;
-      if (phone !== undefined) profileUpdates.phone = phone.trim() || null;
+      // if (phone !== undefined) profileUpdates.phone = phone.trim() || null; // Removed
       if (avatar_url !== undefined) profileUpdates.avatar_url = avatar_url === null ? null : (avatar_url.trim() || null);
 
       // Ensure status is not accidentally overwritten if not provided

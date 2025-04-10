@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
+import { toast } from "sonner"; // Import sonner toast
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 const PropertyDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  // Removed useToast hook call
   // Update to use refactored useApp
   const { 
     properties: propertiesContext, 
@@ -79,22 +80,21 @@ const PropertyDetailsPage: React.FC = () => {
     try {
       if (isFavorite) {
         await removeFromFavorites(property.id);
-        toast({
-          title: "تم الإزالة من المفضلة",
+        // Use sonner toast.success
+        toast.success("تم الإزالة من المفضلة", {
           description: "تم إزالة العقار من قائمة المفضلة بنجاح",
         });
       } else {
         await addToFavorites(property.id);
-        toast({
-          title: "تمت الإضافة للمفضلة",
+        // Use sonner toast.success
+        toast.success("تمت الإضافة للمفضلة", {
           description: "تمت إضافة العقار إلى قائمة المفضلة بنجاح",
         });
       }
     } catch (error) {
-      toast({
-        title: "حدث خطأ",
+      // Use sonner toast.error
+      toast.error("حدث خطأ", {
         description: "لم نتمكن من تحديث قائمة المفضلة",
-        variant: "destructive",
       });
     }
   };
@@ -127,7 +127,7 @@ const PropertyDetailsPage: React.FC = () => {
         batch: formData.batch,
         phone: formData.phone,
         alternative_phone: formData.alternativePhone || null,
-        status: "pending",
+        status: "pending" as const, // Explicitly type status
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -148,8 +148,8 @@ const PropertyDetailsPage: React.FC = () => {
       }
 
       // تحديث واجهة المستخدم بعد نجاح العملية
-      toast({
-        title: "تم إرسال طلب الحجز",
+      // Use sonner toast.success
+      toast.success("تم إرسال طلب الحجز", {
         description:
           "تم إرسال طلب الحجز بنجاح. سنتواصل معك قريباً لتأكيد الحجز.",
       });
@@ -159,10 +159,9 @@ const PropertyDetailsPage: React.FC = () => {
       console.error('خطأ في إرسال طلب الحجز:', error);
       // Display the specific Supabase error message
       const errorMessage = error?.message || "لم نتمكن من إرسال طلب الحجز";
-      toast({
-        title: "حدث خطأ",
+      // Use sonner toast.error
+      toast.error("حدث خطأ", {
         description: errorMessage, // Use the specific error message here
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);

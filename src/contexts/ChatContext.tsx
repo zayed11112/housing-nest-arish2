@@ -14,8 +14,10 @@ export interface ChatMessage extends MessagesRow {
 interface ChatContextType {
   messages: ChatMessage[];
   isLoadingMessages: boolean;
-  adminUser: ProfilesRow | null; // Store the admin user info
-  sendMessage: (messageText: string | null, imageUrl?: string | null) => Promise<boolean>; // Modified sendMessage
+  adminUser: ProfilesRow | null; // Still useful for non-admins
+  activeChatPartnerId: string | null; // ID of the user being chatted with
+  setActiveChatPartner: (userId: string | null) => void; // Function to set the partner
+  sendMessage: (messageText: string | null, imageUrl?: string | null) => Promise<boolean>;
   refreshMessages: () => Promise<void>;
 }
 
@@ -25,10 +27,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [adminUser, setAdminUser] = useState<ProfilesRow | null>(null); // State for admin user
+  const [adminUser, setAdminUser] = useState<ProfilesRow | null>(null);
+  const [activeChatPartnerId, setActiveChatPartnerId] = useState<string | null>(null); // State for active chat partner
   const messagesChannelRef = useRef<RealtimeChannel | null>(null);
 
-  // Function to find the first admin user
+  // Function to find the first admin user (still needed for non-admins)
   const findAdmin = useCallback(async (): Promise<ProfilesRow | null> => {
     try {
       const { data, error } = await supabase
@@ -58,42 +61,62 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     findAdmin().then(setAdminUser);
   }, [findAdmin]);
 
-  // Function to fetch messages between current user and admin
+  // Function to set the active chat partner
+  const setActiveChatPartner = useCallback((userId: string | null) => {
+    console.log("Setting active chat partner:", userId);
+    setActiveChatPartnerId(userId);
+    // Clear messages when partner changes
+    setMessages([]);
+  }, []);
+
+  // Function to fetch messages between current user and the active partner
   const fetchMessages = useCallback(async () => {
-    if (!currentUser || !adminUser) {
+    // Determine the partner ID: if admin, use activeChatPartnerId; if user, use adminUser.id
+    const partnerId = currentUser?.role === 'admin' ? activeChatPartnerId : adminUser?.id;
+
+    if (!currentUser || !partnerId) {
       setMessages([]);
       return;
     }
+
+    console.log(`Fetching messages between ${currentUser.id} and ${partnerId}`);
     setIsLoadingMessages(true);
     try {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${adminUser.id}),and(sender_id.eq.${adminUser.id},receiver_id.eq.${currentUser.id})`)
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${currentUser.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
       setMessages((data as ChatMessage[]) || []);
+      console.log(`Fetched ${data?.length || 0} messages`);
     } catch (error) {
       console.error("Error fetching messages:", error);
       toast.error(`خطأ في جلب الرسائل: ${(error as Error).message}`);
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [currentUser, adminUser]);
+  }, [currentUser, adminUser, activeChatPartnerId]); // Depend on active partner
 
-  // Fetch initial messages
+  // Fetch messages when the active partner changes (or admin/user loads)
   useEffect(() => {
-    if (currentUser && adminUser) {
+    // Determine the partner ID based on role
+    const partnerId = currentUser?.role === 'admin' ? activeChatPartnerId : adminUser?.id;
+
+    if (currentUser && partnerId) {
       fetchMessages();
     } else {
-      setMessages([]);
+      setMessages([]); // Clear messages if no user or partner
     }
-  }, [currentUser, adminUser, fetchMessages]);
+  }, [currentUser, adminUser, activeChatPartnerId, fetchMessages]);
 
-  // Setup Realtime subscription
+  // Setup Realtime subscription based on active partner
   useEffect(() => {
-    if (!currentUser || !adminUser) {
+    // Determine the partner ID
+    const partnerId = currentUser?.role === 'admin' ? activeChatPartnerId : adminUser?.id;
+
+    if (!currentUser || !partnerId) {
       if (messagesChannelRef.current) {
         supabase.removeChannel(messagesChannelRef.current);
         messagesChannelRef.current = null;
@@ -101,14 +124,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const userIds = [currentUser.id, adminUser.id].sort();
+    // Ensure consistent channel naming regardless of who is sender/receiver
+    const userIds = [currentUser.id, partnerId].sort();
     const channelName = `chat-${userIds[0]}-${userIds[1]}`;
 
+    // If channel exists but topic is wrong (partner changed), remove old one
     if (messagesChannelRef.current && messagesChannelRef.current.topic !== channelName) {
-       supabase.removeChannel(messagesChannelRef.current).then(() => console.log("Removed previous channel"));
+       supabase.removeChannel(messagesChannelRef.current).then(() => console.log("Removed previous channel due to partner change"));
        messagesChannelRef.current = null;
     }
 
+    // Subscribe if channel doesn't exist for this pair
     if (!messagesChannelRef.current) {
       console.log(`Attempting to subscribe to ${channelName}`);
       const channel = supabase
@@ -119,8 +145,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             event: 'INSERT',
             schema: 'public',
             table: 'messages',
-            // Reverted Filter: Specific to the two participants
-            filter: `or(and(sender_id=eq.${currentUser.id},receiver_id=eq.${adminUser.id}),and(sender_id=eq.${adminUser.id},receiver_id=eq.${currentUser.id}))`
+            // Filter for messages between the two specific participants
+            filter: `or(and(sender_id=eq.${currentUser.id},receiver_id=eq.${partnerId}),and(sender_id=eq.${partnerId},receiver_id=eq.${currentUser.id}))`
           },
           (payload) => {
             console.log('Realtime message payload:', payload);
@@ -163,14 +189,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [currentUser, adminUser]);
 
-  // Function to send a message (text or image)
+  // Function to send a message (text or image) to the active partner
   const sendMessage = async (messageText: string | null, imageUrl: string | null = null): Promise<boolean> => {
-    if (!currentUser || !adminUser) return false;
-    if (!messageText?.trim() && !imageUrl) return false;
+    // Determine the partner ID
+    const partnerId = currentUser?.role === 'admin' ? activeChatPartnerId : adminUser?.id;
+
+    if (!currentUser || !partnerId) {
+      toast.error("لا يمكن إرسال الرسالة. المستخدم أو الطرف الآخر غير محدد.");
+      return false;
+    }
+    if (!messageText?.trim() && !imageUrl) return false; // Don't send empty messages
 
     const newMessageData: MessagesRow['Insert'] = {
       sender_id: currentUser.id,
-      receiver_id: adminUser.id,
+      receiver_id: partnerId, // Send to the active partner
       message_text: messageText ? messageText.trim() : null,
       image_url: imageUrl,
     };
@@ -178,11 +210,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { error } = await supabase.from('messages').insert(newMessageData);
       if (error) throw error;
-      return true;
+      return true; // Indicate success
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error(`خطأ في إرسال الرسالة: ${(error as Error).message}`);
-      return false;
+      return false; // Indicate failure
     }
   };
 
@@ -190,8 +222,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     messages,
     isLoadingMessages,
     adminUser,
+    activeChatPartnerId, // Expose active partner ID
+    setActiveChatPartner, // Expose setter function
     sendMessage,
-    refreshMessages: fetchMessages,
+    refreshMessages: fetchMessages, // Refresh fetches for the active partner
   };
 
   return (

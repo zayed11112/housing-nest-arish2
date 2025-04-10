@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
 import { toast } from "sonner";
 import {
   Form,
@@ -33,7 +33,7 @@ const loginFormSchema = z.object({
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 const LoginPage = () => {
-  const { toast: uiToast } = useToast();
+  // Removed uiToast declaration
   const navigate = useNavigate();
   const { login, currentUser, isLoading } = useAuth();
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
@@ -86,10 +86,9 @@ const LoginPage = () => {
       }, 500);
     } catch (error) {
       setStatus("error");
-      uiToast({
-        title: "خطأ في تسجيل الدخول",
+      // Replaced uiToast with toast.error from sonner
+      toast.error("خطأ في تسجيل الدخول", {
         description: error instanceof Error ? error.message : "حدث خطأ غير متوقع",
-        variant: "destructive",
       });
     }
   };

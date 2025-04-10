@@ -31,6 +31,7 @@ interface PropertiesContextType {
   deleteProperty: (id: string) => Promise<void>;
   duplicateProperty: (id: string) => Promise<void>;
   isLoading: boolean;
+  getPropertyById: (id: string) => Promise<Property | null>;
 }
 
 const PropertiesContext = createContext<PropertiesContextType | undefined>(undefined);
@@ -667,13 +668,93 @@ export const PropertiesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const getPropertyById = async (id: string): Promise<Property | null> => {
+    try {
+      // أولاً، نبحث في قائمة العقارات المحملة مسبقًا في الذاكرة
+      console.log('Searching for property in memory first, ID:', id);
+      const propertyInMemory = properties.find(p => p.id === id);
+      
+      if (propertyInMemory) {
+        console.log('Found property in memory:', propertyInMemory);
+        return propertyInMemory;
+      }
+      
+      console.log('Property not found in memory, fetching from database...');
+      
+      // إذا لم نجد العقار في الذاكرة، نقوم بجلبه من قاعدة البيانات
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching property from database:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.log('Property not found in database');
+        return null;
+      }
+
+      console.log('Found property in database:', data);
+      
+      const property = {
+        id: data.id,
+        name: data.name || "عقار بدون اسم",
+        location: data.location || "",
+        rooms: data.rooms || 1,
+        bathrooms: data.bathrooms || 1,
+        size: data.size || 0,
+        beds: data.beds || 1,
+        price: data.price || 0,
+        discount: data.discount || 0,
+        property_type: (data.property_type || 'شقة') as PropertyType,
+        status: (data.status || 'للإيجار') as PropertyStatus,
+        amenities: data.amenities || [],
+        images: data.images || [],
+        description: data.description || "",
+        available: data.available === undefined ? true : data.available,
+        createdAt: data.created_at || new Date().toISOString(),
+        updatedAt: data.updated_at || new Date().toISOString(),
+        residential_unit_type: data.residential_unit_type as ResidentialUnitType,
+        housing_category: data.housing_category as HousingCategory,
+        area_type: data.area_type as AreaType,
+        special_property_type: (data.special_property_type || 'عادي') as SpecialPropertyType,
+      };
+      
+      // إضافة العقار إلى قائمة العقارات في الذاكرة إذا لم يكن موجودًا
+      setProperties(prev => {
+        if (!prev.some(p => p.id === property.id)) {
+          return [...prev, property];
+        }
+        return prev;
+      });
+      
+      return property;
+    } catch (error) {
+      console.error('Error in getPropertyById:', error);
+      
+      // في حالة الخطأ، نحاول البحث مرة أخرى في الذاكرة
+      const fallbackProperty = properties.find(p => p.id === id);
+      if (fallbackProperty) {
+        console.log('Fallback: Found property in memory after error:', fallbackProperty);
+        return fallbackProperty;
+      }
+      
+      return null;
+    }
+  };
+
   const contextValue: PropertiesContextType = {
     properties,
     addProperty,
     updateProperty,
     deleteProperty,
     duplicateProperty,
-    isLoading
+    isLoading,
+    getPropertyById
   };
 
   return <PropertiesContext.Provider value={contextValue}>{children}</PropertiesContext.Provider>;

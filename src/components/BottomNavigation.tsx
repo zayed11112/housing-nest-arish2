@@ -1,12 +1,13 @@
 
 import React, { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Heart, User, CalendarClock } from 'lucide-react';
+import { Home, Search, Heart, User, CalendarClock, MessageSquare } from 'lucide-react'; // Import MessageSquare
 import { useApp } from '@/contexts/AppContext';
 
 const BottomNavigation: React.FC = () => {
   const location = useLocation();
-  const { currentUser } = useApp();
+  const { auth } = useApp(); // Destructure auth from useApp
+  const { currentUser } = auth; // Get currentUser from auth
   
   // استخدام useMemo لمنع إعادة إنشاء المصفوفة في كل مرة تحديث
   const navItems = useMemo(() => [
@@ -35,11 +36,19 @@ const BottomNavigation: React.FC = () => {
       icon: <User className="h-6 w-6" />,
       label: 'حسابي',
     },
+    {
+      path: '/chat', // Link to the main chat page for users
+      icon: <MessageSquare className="h-6 w-6" />,
+      label: 'المحادثة',
+    },
   ], []);
+
+  // Adjust grid columns based on number of items
+  const gridColsClass = `grid-cols-${navItems.length}`;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border">
-      <div className="grid grid-cols-5 h-16">
+      <div className={`grid ${gridColsClass} h-16`}>
         {navItems.map((item) => (
           <Link
             key={item.path}

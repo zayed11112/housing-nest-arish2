@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, PlusCircle, X, Image as ImageIcon, Upload, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +40,7 @@ const imgbbApiKey = "e5ca1f47577dd78e2b024ada3ecb6dd9";
 const AddPropertyPage: React.FC = () => {
   console.log('تم تحميل صفحة إضافة العقار');
   const navigate = useNavigate();
-  const { toast: uiToast } = useToast();
+  // Removed uiToast declaration
   const { currentUser, isLoading: authLoading } = useAuth();
   const { addProperty, isLoading: propertiesLoading } = useProperties();
   
@@ -70,15 +70,14 @@ const AddPropertyPage: React.FC = () => {
     
     if (!authLoading && (!currentUser || currentUser.role !== "admin")) {
       console.error('المستخدم ليس مسؤولاً:', currentUser?.role);
-      uiToast({
-        title: "تنبيه الوصول",
+      // Use sonner toast.error
+      toast.error("تنبيه الوصول", {
         description: "ليس لديك صلاحيات للوصول إلى هذه الصفحة",
-        variant: "destructive",
       });
       
       navigate("/");
     }
-  }, [currentUser, navigate, authLoading, uiToast]);
+  }, [currentUser, navigate, authLoading]); // Removed uiToast from dependency array
 
   const [formData, setFormData] = useState({
     name: "",
@@ -167,10 +166,9 @@ const AddPropertyPage: React.FC = () => {
       }
     } catch (error) {
       console.error('خطأ في تحميل الصورة:', error);
-      uiToast({
-        title: "خطأ في التحميل",
+      // Use sonner toast.error
+      toast.error("خطأ في التحميل", {
         description: error instanceof Error ? error.message : "حدث خطأ غير معروف",
-        variant: "destructive",
       });
       return null;
     } finally {
@@ -186,20 +184,18 @@ const AddPropertyPage: React.FC = () => {
     
     // Check if the file is an image
     if (!file.type.startsWith('image/')) {
-      uiToast({
-        title: "نوع ملف غير مدعوم",
+      // Use sonner toast.error
+      toast.error("نوع ملف غير مدعوم", {
         description: "يرجى اختيار ملف صورة صالح",
-        variant: "destructive",
       });
       return;
     }
     
     // Check if the file size is less than 2MB
     if (file.size > 2 * 1024 * 1024) {
-      uiToast({
-        title: "حجم الملف كبير جدًا",
+      // Use sonner toast.error
+      toast.error("حجم الملف كبير جدًا", {
         description: "يجب أن يكون حجم الصورة أقل من 2 ميجابايت",
-        variant: "destructive",
       });
       return;
     }
@@ -223,19 +219,17 @@ const AddPropertyPage: React.FC = () => {
   
   const handleAddImageUrl = () => {
     if (!imageUrl.trim()) {
-      uiToast({
-        title: "الرابط فارغ",
+      // Use sonner toast.error
+      toast.error("الرابط فارغ", {
         description: "يرجى إدخال رابط صورة صالح",
-        variant: "destructive",
       });
       return;
     }
     
     if (!imageUrl.match(/^(http|https):\/\/[^ "]+$/)) {
-      uiToast({
-        title: "رابط غير صالح",
+      // Use sonner toast.error
+      toast.error("رابط غير صالح", {
         description: "يرجى إدخال رابط صورة صالح يبدأ بـ http:// أو https://",
-        variant: "destructive",
       });
       return;
     }
@@ -265,10 +259,9 @@ const AddPropertyPage: React.FC = () => {
     
     // التحقق من حالة تسجيل الدخول
     if (!currentUser && !localStorage.getItem("housing_nest_user")) {
-      uiToast({
-        title: "غير مسجل دخول",
+      // Use sonner toast.error
+      toast.error("غير مسجل دخول", {
         description: "يرجى تسجيل الدخول لإضافة عقار جديد",
-        variant: "destructive",
       });
       return;
     }
@@ -276,20 +269,18 @@ const AddPropertyPage: React.FC = () => {
     // التحقق من البيانات المطلوبة
     if (formData.images.length === 0) {
       console.warn('تنبيه: لم يتم إضافة صور للعقار');
-      uiToast({
-        title: "لا توجد صور للعقار",
+      // Use sonner toast.error
+      toast.error("لا توجد صور للعقار", {
         description: "يرجى إضافة صورة واحدة على الأقل",
-        variant: "destructive",
       });
       return;
     }
     
     if (!formData.name.trim() || !formData.location.trim()) {
       console.warn('تنبيه: البيانات المطلوبة غير مكتملة');
-      uiToast({
-        title: "بيانات غير مكتملة",
+      // Use sonner toast.error
+      toast.error("بيانات غير مكتملة", {
         description: "يرجى ملء جميع الحقول المطلوبة",
-        variant: "destructive",
       });
       return;
     }
@@ -344,22 +335,19 @@ const AddPropertyPage: React.FC = () => {
           error.message.includes('timeout'))) {
         
         setConnectionError(true);
-        uiToast({
-          title: "مشكلة في الاتصال",
+        // Use sonner toast.error
+        toast.error("مشكلة في الاتصال", {
           description: "يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى",
-          variant: "destructive",
         });
       } else if (error instanceof Error && error.message.includes('لديك صلاحية')) {
-        uiToast({
-          title: "خطأ في الصلاحيات",
+        // Use sonner toast.error
+        toast.error("خطأ في الصلاحيات", {
           description: "يجب أن تكون مسؤولاً لإضافة عقار جديد",
-          variant: "destructive",
         });
       } else {
-        uiToast({
-          title: "فشل إضافة العقار",
+        // Use sonner toast.error
+        toast.error("فشل إضافة العقار", {
           description: error instanceof Error ? error.message : "حدث خطأ غير متوقع",
-          variant: "destructive",
         });
       }
     } finally {

@@ -40,8 +40,9 @@ const AdminChatsListPage: React.FC = () => {
       setIsLoading(true);
       try {
         // 1. Get distinct user IDs the admin has chatted with
+        // Reverted argument name back to 'admin_id' to match SQL and corrected TS types
         const { data: userIdsData, error: userIdsError } = await supabase
-          .rpc('get_distinct_chat_partners', { admin_id: currentUser.id });
+          .rpc('get_distinct_chat_partners', { admin_id: currentUser.id }); 
 
         if (userIdsError) throw userIdsError;
 
@@ -163,7 +164,8 @@ const AdminChatsListPage: React.FC = () => {
               <button
                 key={convo.userId}
                 className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-right"
-                onClick={() => navigate(`/chat?userId=${convo.userId}`)} // Navigate to specific chat
+                // Corrected navigation to use path parameter instead of query parameter
+                onClick={() => navigate(`/chat/${convo.userId}`)} 
               >
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={convo.avatarUrl || undefined} alt={convo.userName || 'User'} />

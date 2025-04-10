@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,7 @@ import { toast } from "sonner";
 
 const AdminPropertiesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { toast: uiToast } = useToast();
+  // Removed uiToast declaration
   const { currentUser, isLoading } = useAuth();
   const { properties, deleteProperty, duplicateProperty } = useProperties();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -31,14 +31,13 @@ const AdminPropertiesPage: React.FC = () => {
   // Check if the user is an admin, if not redirect to home
   useEffect(() => {
     if (!isLoading && (!currentUser || currentUser.role !== "admin")) {
-      uiToast({
-        title: "تنبيه الوصول",
+      // Use sonner toast.error
+      toast.error("تنبيه الوصول", {
         description: "ليس لديك صلاحيات للوصول إلى هذه الصفحة",
-        variant: "destructive",
       });
       navigate("/");
     }
-  }, [currentUser, navigate, isLoading, uiToast]);
+  }, [currentUser, navigate, isLoading]); // Removed uiToast from dependency array
 
   const handleDeleteProperty = async () => {
     if (propertyToDelete) {
@@ -108,11 +107,7 @@ const AdminPropertiesPage: React.FC = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => {
-            console.log('تم النقر على زر إضافة عقار جديد في الأعلى');
-            console.log('الانتقال إلى:', '/admin/properties/add');
-            navigate("/admin/properties/add");
-          }}
+          onClick={() => navigate("/admin/properties/add")}
         >
           <Plus className="h-5 w-5" />
         </Button>
@@ -170,9 +165,7 @@ const AdminPropertiesPage: React.FC = () => {
                     variant="outline"
                     size="sm"
                     className="flex items-center"
-                    onClick={() =>
-                      navigate(`/admin/properties/edit/${property.id}`)
-                    }
+                    onClick={() => navigate(`/admin/properties/edit/${property.id}`)}
                   >
                     <Edit className="h-4 w-4 ml-1" />
                     تعديل
@@ -193,11 +186,7 @@ const AdminPropertiesPage: React.FC = () => {
         ) : (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">لا توجد عقارات مضافة</p>
-            <Button onClick={() => {
-              console.log('تم النقر على زر إضافة عقار جديد الوسطي');
-              console.log('الانتقال إلى:', '/admin/properties/add');
-              navigate("/admin/properties/add");
-            }}>
+            <Button onClick={() => navigate("/admin/properties/add")}>
               <Plus className="h-4 w-4 ml-2" />
               إضافة عقار جديد
             </Button>
@@ -208,11 +197,7 @@ const AdminPropertiesPage: React.FC = () => {
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4">
         <Button
           className="w-full"
-          onClick={() => {
-            console.log('تم النقر على زر إضافة عقار جديد السفلي');
-            console.log('الانتقال إلى:', '/admin/properties/add');
-            navigate("/admin/properties/add");
-          }}
+          onClick={() => navigate("/admin/properties/add")}
         >
           <Plus className="h-4 w-4 ml-2" />
           إضافة عقار جديد

@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { Property } from "@/types"; // Import the Property type
 import AppLayout from "@/components/AppLayout";
 import PropertyCard from "@/components/PropertyCard";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,11 @@ const FavoritesPage: React.FC = () => {
   const { properties } = propertiesContext; // Destructure properties array
   const { currentUser } = auth; // Destructure currentUser
 
-  // Get full property details for favorites
+  // Use the property data directly from the favorites context
+  // Filter out favorites where the nested property data might be missing
   const favoriteProperties = favorites
-    .map((favorite) => properties.find((p) => p.id === favorite.propertyId))
-    .filter((p): p is NonNullable<typeof p> => p !== undefined);
+    .map(favorite => favorite.property) // Get the nested property object
+    .filter((p): p is Property => p !== undefined && p !== null); // Ensure property is not undefined/null
 
   if (!currentUser) {
     return (

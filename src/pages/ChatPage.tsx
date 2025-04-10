@@ -1,213 +1,152 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react'; // Removed useCallback
+import { useNavigate, useParams, useLocation } from 'react-router-dom'; // Added useParams, useLocation, removed useSearchParams
 import AppLayout from '@/components/AppLayout';
-import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext'; // Use AuthContext directly
+import { useChat, ChatMessage } from '@/contexts/ChatContext'; // Use ChatContext
+import { Property } from '@/types'; // Import Property type
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, ArrowLeft, RefreshCw, UserCircle, Paperclip, Image as ImageIcon, Loader2, MessageSquare } from 'lucide-react'; // Added icons
+import { Send, ArrowLeft, RefreshCw, Paperclip, Image as ImageIcon, Loader2, MessageSquare } from 'lucide-react'; // Removed UserCircle
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
-import { ProfilesRow, MessagesRow } from '@/types/database';
-import { ChatMessage } from '@/contexts/ChatContext';
+import { ProfilesRow } from '@/types/database';
 import { toast } from 'sonner';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 const imgbbApiKey = "d4c80caf18ac57a20be196713f4245c2"; // Your ImgBB API Key
 
 const ChatPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { auth, isLoading: isAppLoading } = useApp();
-  const { currentUser } = auth;
+  const { userId: userIdFromUrl } = useParams<{ userId: string }>(); // Get userId from URL path
+  const location = useLocation();
+  const propertyFromState = location.state?.property as Property | undefined; // Get property from state
 
-  const adminChatTargetUserId = searchParams.get('userId');
+  const { currentUser, isLoading: isAuthLoading } = useAuth(); // Use AuthContext
+  const {
+    messages,
+    isLoadingMessages,
+    sendMessage,
+    setActiveChatPartner,
+    refreshMessages,
+    adminUser, // Get adminUser for non-admin users
+  } = useChat(); // Use ChatContext
 
-  const [targetUser, setTargetUser] = useState<ProfilesRow | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
+  const [targetUserProfile, setTargetUserProfile] = useState<ProfilesRow | null>(null); // State for target user's profile
+  const [isLoadingTargetProfile, setIsLoadingTargetProfile] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false); // State for image upload
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesChannelRef = useRef<RealtimeChannel | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialMessageSentRef = useRef(false); // Ref to track if initial message was sent
 
-  // Determine the target user
+  // Determine the target user ID and set active chat partner
   useEffect(() => {
-    const determineTargetUser = async () => {
-      if (!currentUser) return;
-      setIsLoadingMessages(true);
-
-      let targetId: string | null = null;
-
-      if (currentUser.role === 'admin' && adminChatTargetUserId) {
-        targetId = adminChatTargetUserId;
-      } else if (currentUser.role !== 'admin') {
-        try {
-          const { data: adminData, error: adminError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('role', 'admin')
-            .limit(1)
-            .single();
-          if (adminError && adminError.code !== 'PGRST116') throw adminError;
-          targetId = adminData?.id || null;
-          if (!targetId) console.warn("No admin user found.");
-        } catch (error) { console.error("Error fetching default admin profile:", error); }
-      } else {
-        navigate('/admin/chats');
-        return;
-      }
-
-      if (targetId) {
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', targetId)
-            .single();
-          if (profileError) throw profileError;
-          setTargetUser(profileData as ProfilesRow);
-        } catch (error) {
-          console.error("Error fetching target user profile:", error);
-          toast.error("لا يمكن تحميل بيانات المستخدم للشات.");
-        }
-      } else if (currentUser.role !== 'admin') {
-         toast.error("لا يوجد مسؤول متاح للشات حالياً.");
-         setTargetUser(null);
-      }
-    };
-    determineTargetUser();
-  }, [currentUser, adminChatTargetUserId, navigate]);
-
-  // Fetch messages
-  const fetchMessages = useCallback(async () => {
-     if (!currentUser || !targetUser) {
-      setMessages([]);
-      setIsLoadingMessages(false);
-      return;
-    }
-    console.log(`Fetching messages between ${currentUser.id} and ${targetUser.id}`);
-    setIsLoadingMessages(true);
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${targetUser.id}),and(sender_id.eq.${targetUser.id},receiver_id.eq.${currentUser.id})`)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setMessages((data as ChatMessage[]) || []);
-      console.log(`Fetched ${data?.length || 0} messages.`);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-      toast.error(`خطأ في جلب الرسائل: ${(error as Error).message}`);
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, [currentUser, targetUser]);
-
-  useEffect(() => {
-    if (targetUser) { fetchMessages(); }
-    else { setMessages([]); setIsLoadingMessages(false); }
-  }, [targetUser, fetchMessages]);
-
-  // Realtime subscription
-  useEffect(() => {
-     if (!currentUser || !targetUser) {
-      if (messagesChannelRef.current) {
-        supabase.removeChannel(messagesChannelRef.current);
-        messagesChannelRef.current = null;
-      }
-      return;
+    let targetId: string | null = null;
+    if (currentUser?.role === 'admin' && userIdFromUrl) {
+      targetId = userIdFromUrl;
+    } else if (currentUser?.role !== 'admin') {
+      targetId = adminUser?.id || null; // Non-admin users chat with the admin
     }
 
-    const userIds = [currentUser.id, targetUser.id].sort();
-    const channelName = `chat-${userIds[0]}-${userIds[1]}`;
-
-    if (messagesChannelRef.current && messagesChannelRef.current.topic !== channelName) {
-       supabase.removeChannel(messagesChannelRef.current).then(() => console.log("Removed previous channel"));
-       messagesChannelRef.current = null;
+    if (targetId) {
+      console.log("Setting active partner in ChatPage effect:", targetId);
+      setActiveChatPartner(targetId);
+    } else if (currentUser && currentUser.role === 'admin' && !userIdFromUrl) {
+      // Admin landed on /chat without a specific user, redirect to list
+      navigate('/admin/chats');
+    } else if (currentUser && currentUser.role !== 'admin' && !adminUser) {
+      // User landed on /chat but admin couldn't be found
+      console.warn("ChatPage: Admin user not found for non-admin user.");
+      // Optionally show an error message or redirect
     }
 
-    if (!messagesChannelRef.current) {
-      console.log(`Attempting to subscribe to ${channelName}`);
-      const channel = supabase
-        .channel(channelName)
-        .on<MessagesRow>(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `or(and(sender_id=eq.${currentUser.id},receiver_id=eq.${targetUser.id}),and(sender_id=eq.${targetUser.id},receiver_id=eq.${currentUser.id}))`
-          },
-          (payload) => {
-            console.log('Realtime message payload:', payload);
-            const newMessage = payload.new as ChatMessage;
-            if (newMessage && ((newMessage.sender_id === currentUser.id && newMessage.receiver_id === targetUser.id) || (newMessage.sender_id === targetUser.id && newMessage.receiver_id === currentUser.id))) {
-                setMessages((prevMessages) => {
-                if (prevMessages.some(msg => msg.id === newMessage.id)) {
-                    return prevMessages;
-                }
-                console.log('Adding new message via realtime:', newMessage);
-                return [...prevMessages, newMessage];
-                });
-            } else {
-                 console.log('Realtime message ignored (not for this specific chat pair):', newMessage);
-            }
-          }
-        )
-        .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') { console.log(`Realtime subscribed to ${channelName}`); }
-          else if (status === 'CHANNEL_ERROR') { console.error(`Realtime channel error on ${channelName}:`, err); toast.error("خطأ في اتصال الشات اللحظي."); }
-          else if (status === 'TIMED_OUT') { console.warn(`Realtime channel timed out on ${channelName}`); }
-          else { console.log(`Realtime channel status on ${channelName}: ${status}`); }
-        });
-      messagesChannelRef.current = channel;
-    }
-
+    // Cleanup function to reset partner when leaving the page
     return () => {
-      if (messagesChannelRef.current) {
-        supabase.removeChannel(messagesChannelRef.current);
-        messagesChannelRef.current = null;
-        console.log(`Realtime unsubscribed from ${channelName}`);
+      console.log("ChatPage unmounting, resetting active partner");
+      setActiveChatPartner(null);
+    };
+  }, [currentUser, userIdFromUrl, adminUser, setActiveChatPartner, navigate]);
+
+  // Fetch target user's profile details
+  useEffect(() => {
+    const fetchTargetProfile = async (id: string) => {
+      setIsLoadingTargetProfile(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        setTargetUserProfile(data as ProfilesRow);
+      } catch (error) {
+        console.error("Error fetching target user profile:", error);
+        toast.error("لا يمكن تحميل بيانات المستخدم للشات.");
+        setTargetUserProfile(null); // Reset on error
+      } finally {
+        setIsLoadingTargetProfile(false);
       }
     };
-  }, [currentUser, targetUser]);
 
-  // Scroll to bottom
+    // Determine the target ID again (could be simplified)
+    let targetId: string | null = null;
+    if (currentUser?.role === 'admin' && userIdFromUrl) {
+      targetId = userIdFromUrl;
+    } else if (currentUser?.role !== 'admin') {
+      targetId = adminUser?.id || null;
+    }
+
+    if (targetId) {
+      fetchTargetProfile(targetId);
+    } else {
+      setTargetUserProfile(null); // No target ID, no profile
+      setIsLoadingTargetProfile(false);
+    }
+  }, [userIdFromUrl, adminUser, currentUser]); // Re-fetch if target changes
+
+  // Send initial message about the property if navigated from admin bookings
+  useEffect(() => {
+    if (
+      currentUser?.role === 'admin' &&
+      propertyFromState &&
+      targetUserProfile && // Ensure target user profile is loaded
+      !isLoadingMessages && // Ensure messages aren't currently loading
+      messages.length === 0 && // Only send if chat is empty
+      !initialMessageSentRef.current // Only send once
+    ) {
+      const initialMessage = `مرحباً ${targetUserProfile.full_name || '،'} بخصوص حجز العقار: ${propertyFromState.name} (${propertyFromState.location})`;
+      initialMessageSentRef.current = true; // Mark as sent
+      sendMessage(initialMessage, null).then(success => {
+        if (success) {
+          console.log("Initial property message sent.");
+          // Optionally refresh messages after sending, though realtime should handle it
+          // refreshMessages();
+        } else {
+          console.error("Failed to send initial property message.");
+          initialMessageSentRef.current = false; // Allow retry if failed?
+        }
+      });
+    }
+  }, [
+      currentUser,
+      propertyFromState,
+      targetUserProfile,
+      isLoadingMessages,
+      messages,
+      sendMessage,
+      // refreshMessages // Add if refresh is needed after send
+  ]);
+
+
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Send Message (Text or Image URL)
-  const sendMessageInternal = async (text: string | null, imageUrl: string | null = null) => {
-    if (!currentUser || !targetUser) return false;
-    if (!text && !imageUrl) return false; // Must have text or image
-
-    const newMessageData: MessagesRow['Insert'] = {
-      sender_id: currentUser.id,
-      receiver_id: targetUser.id,
-      message_text: text,
-      image_url: imageUrl, // Add image_url
-    };
-
-    try {
-      const { error } = await supabase.from('messages').insert(newMessageData);
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error("Error sending message:", error);
-      toast.error(`خطأ في إرسال الرسالة: ${(error as Error).message}`);
-      return false;
-    }
-  };
-
-  // Text Send Handler
+  // Text Send Handler (uses sendMessage from context)
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!newMessage.trim() || isSending || isUploadingImage) return;
@@ -216,19 +155,18 @@ const ChatPage: React.FC = () => {
     setNewMessage('');
     setIsSending(true);
 
-    const success = await sendMessageInternal(textToSend.trim());
+    const success = await sendMessage(textToSend.trim(), null); // Use context's sendMessage
     if (!success) {
       setNewMessage(textToSend); // Restore text on failure
-    } else {
-      // If sending was successful, immediately fetch messages
-      fetchMessages();
     }
+    // No need to manually fetch, realtime/context handles updates
     setIsSending(false);
   };
 
   // Image Upload Handler
   const handleImageUpload = async (file: File) => {
-    if (!currentUser || !targetUser || isSending || isUploadingImage) return;
+    // Use displayTargetUser which holds the profile of the active partner
+    if (!currentUser || !displayTargetUser || isSending || isUploadingImage) return; 
 
     setIsUploadingImage(true);
     try {
@@ -249,7 +187,8 @@ const ChatPage: React.FC = () => {
       }
 
       const imageUrl = data.data.url; // Use the direct URL
-      const success = await sendMessageInternal(null, imageUrl); // Send message with image URL
+      // Use sendMessage from context instead of the removed sendMessageInternal
+      const success = await sendMessage(null, imageUrl); 
 
       if (success) {
         toast.success("تم إرسال الصورة بنجاح.");
@@ -286,7 +225,6 @@ const ChatPage: React.FC = () => {
     }
   };
 
-
   // Helper to get initials
   const getInitials = (name: string | null | undefined): string => {
     if (!name) return '?';
@@ -301,69 +239,64 @@ const ChatPage: React.FC = () => {
   };
 
   // Loading/Error States
-   if (isAppLoading || !currentUser) {
-    return <AppLayout hideBottomNav><div className="mt-16 p-4 text-center">جاري التحميل...</div></AppLayout>;
+  if (isAuthLoading || !currentUser) {
+    return <AppLayout hideBottomNav><div className="mt-16 p-4 text-center">جاري تحميل المستخدم...</div></AppLayout>;
   }
-  if (currentUser.role !== 'admin' && !targetUser && !isLoadingMessages) {
-     return (
-       <AppLayout hideBottomNav>
-         <div className="mt-16 p-4 text-center text-red-600">لا يوجد مسؤول متاح للمحادثة حالياً.</div>
-       </AppLayout>
-     );
-  }
-   if (currentUser.role === 'admin' && !targetUser && isLoadingMessages) {
-     return (
-       <AppLayout hideBottomNav>
-         <div className="mt-16 p-4 text-center">جاري تحميل بيانات المستخدم...</div>
-       </AppLayout>
-     );
-   }
-    if (currentUser.role === 'admin' && !targetUser && !isLoadingMessages) {
-     return (
-       <AppLayout hideBottomNav>
-         <div className="mt-16 p-4 text-center text-red-600">المستخدم المحدد غير موجود.</div>
-       </AppLayout>
-     );
-   }
+  // Determine the effective target user for display/logic
+  const displayTargetUser = currentUser.role === 'admin' ? targetUserProfile : adminUser;
 
+  if (!displayTargetUser && (isLoadingTargetProfile || (currentUser.role !== 'admin' && !adminUser))) {
+     return <AppLayout hideBottomNav><div className="mt-16 p-4 text-center">جاري تحميل بيانات الشات...</div></AppLayout>;
+  }
+
+  if (!displayTargetUser) {
+     const errorMsg = currentUser.role === 'admin'
+       ? "المستخدم المحدد غير موجود أو لا يمكن تحميله."
+       : "لا يوجد مسؤول متاح للمحادثة حالياً.";
+     return (
+       <AppLayout hideBottomNav>
+         <div className="mt-16 p-4 text-center text-red-600">{errorMsg}</div>
+       </AppLayout>
+     );
+   }
 
   return (
     <AppLayout hideBottomNav>
-      {/* Header with enhanced styling */}
+      {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm p-4 border-b border-border shadow-sm">
         <div className="flex items-center justify-between gap-2 w-full">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
+              // Navigate back appropriately
               if (currentUser?.role === 'admin') {
-                navigate('/admin/chats');
+                 navigate(location.state?.fromAdminBookings ? '/admin/bookings' : '/admin/chats');
               } else {
-                navigate(-1);
+                navigate(-1); // Go back for regular users
               }
             }}
             className="hover:bg-muted/80"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          {targetUser && (
-            <div className="flex items-center gap-3 flex-1 justify-center">
-              <Avatar className="h-10 w-10 ring-2 ring-primary/20">
-                <AvatarImage src={targetUser.avatar_url || undefined} alt={targetUser.full_name || 'User'} />
-                <AvatarFallback className="text-lg">{getInitials(targetUser.full_name)}</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="font-bold text-lg">{targetUser.full_name || 'مستخدم'}</span>
-                <span className="text-xs text-muted-foreground">
-                  {targetUser.role === 'admin' ? 'مسؤول النظام' : 'مستخدم'}
-                </span>
-              </div>
+          {/* Display Target User Info */}
+          <div className="flex items-center gap-3 flex-1 justify-center">
+            <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+              <AvatarImage src={displayTargetUser.avatar_url || undefined} alt={displayTargetUser.full_name || 'User'} />
+              <AvatarFallback className="text-lg">{getInitials(displayTargetUser.full_name)}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="font-bold text-lg">{displayTargetUser.full_name || 'مستخدم'}</span>
+              <span className="text-xs text-muted-foreground">
+                {displayTargetUser.role === 'admin' ? 'مسؤول النظام' : 'مستخدم'}
+              </span>
             </div>
-          )}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={fetchMessages} 
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={refreshMessages} // Use refresh from context
             disabled={isLoadingMessages}
             className="hover:bg-muted/80"
           >
@@ -372,9 +305,32 @@ const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Messages Area with enhanced styling */}
-      <div className="fixed inset-0 top-[73px] bottom-[80px] bg-gradient-to-b from-background to-muted/30 overflow-hidden">
+      {/* Messages Area */}
+      {/* Adjust top padding to account for potential property info */}
+      <div className={`fixed inset-0 bottom-[80px] bg-gradient-to-b from-background to-muted/30 overflow-hidden ${propertyFromState ? 'top-[145px]' : 'top-[73px]'}`}>
+        {/* Property Info Card (if available) */}
+        {propertyFromState && (
+          <div className="fixed top-[73px] left-0 right-0 z-40 bg-background/80 backdrop-blur-sm p-3 border-b border-border shadow-sm">
+            <div className="flex items-center gap-3 max-w-md mx-auto">
+              <img
+                src={propertyFromState.images?.[0] || 'https://via.placeholder.com/60?text=N/A'}
+                alt={propertyFromState.name}
+                className="w-12 h-12 rounded-md object-cover border border-border"
+              />
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-semibold truncate">
+                  محادثة بخصوص: {propertyFromState.name}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {propertyFromState.location}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="h-full overflow-y-auto space-y-4 py-4 px-4">
+          {/* Loading/Empty States */}
           {isLoadingMessages && messages.length === 0 && (
             <div className="space-y-6 p-4">
               <Skeleton className="h-12 w-3/4 mr-auto" />
@@ -382,15 +338,17 @@ const ChatPage: React.FC = () => {
               <Skeleton className="h-12 w-3/4 mr-auto" />
             </div>
           )}
-          {!isLoadingMessages && messages.length === 0 && (
+          {!isLoadingMessages && messages.length === 0 && !propertyFromState && ( // Show only if no property context either
             <div className="text-center py-8">
               <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
               <p className="text-muted-foreground text-lg">ابدأ المحادثة الآن...</p>
             </div>
           )}
+
+          {/* Render Messages from Context */}
           {messages.map((msg, index) => (
-            <div
-              key={msg.id || `msg-${index}`}
+             <div
+              key={msg.id || `msg-${index}`} // Use message ID from context
               className={`flex animate-in fade-in slide-in-from-bottom-2 duration-300 ${
                 msg.sender_id === currentUser?.id ? 'justify-start' : 'justify-end'
               }`}
@@ -411,8 +369,8 @@ const ChatPage: React.FC = () => {
                       onClick={() => window.open(msg.image_url, '_blank')}
                     />
                     <p className={`text-sm ${
-                      msg.sender_id === currentUser?.id 
-                        ? 'text-muted-foreground' 
+                      msg.sender_id === currentUser?.id
+                        ? 'text-muted-foreground'
                         : 'text-primary-foreground/70'
                     }`}>
                       {formatTimestamp(msg.created_at)}
@@ -424,8 +382,8 @@ const ChatPage: React.FC = () => {
                       {msg.message_text}
                     </p>
                     <p className={`text-sm mt-1.5 ${
-                      msg.sender_id === currentUser?.id 
-                        ? 'text-muted-foreground' 
+                      msg.sender_id === currentUser?.id
+                        ? 'text-muted-foreground'
                         : 'text-primary-foreground/70'
                     }`}>
                       {formatTimestamp(msg.created_at)}
@@ -439,7 +397,7 @@ const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Input Area with enhanced styling */}
+      {/* Input Area */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-4">
         <form onSubmit={handleSendMessage} className="flex items-center gap-3 w-full">
           <Button
@@ -447,7 +405,7 @@ const ChatPage: React.FC = () => {
             variant="ghost"
             size="icon"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploadingImage || isSending || !targetUser}
+            disabled={isUploadingImage || isSending || !displayTargetUser} // Disable if no target
             className="hover:bg-muted/80"
           >
             {isUploadingImage ? (
@@ -469,13 +427,13 @@ const ChatPage: React.FC = () => {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             className="flex-1 text-base py-6 px-4"
-            disabled={isSending || isUploadingImage || !targetUser}
+            disabled={isSending || isUploadingImage || !displayTargetUser} // Disable if no target
           />
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             size="icon"
             className="h-12 w-12 rounded-full"
-            disabled={!newMessage.trim() || isSending || isUploadingImage || !targetUser}
+            disabled={!newMessage.trim() || isSending || isUploadingImage || !displayTargetUser} // Disable if no target
           >
             {isSending ? (
               <Loader2 className="h-5 w-5 animate-spin" />

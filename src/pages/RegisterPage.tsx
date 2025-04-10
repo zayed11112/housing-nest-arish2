@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
 import { toast } from "sonner";
 import {
   Form,
@@ -46,7 +46,7 @@ const formSchema = z
 type FormValues = z.infer<typeof formSchema>;
 
 const RegisterPage = () => {
-  const { toast: uiToast } = useToast();
+  // Removed uiToast declaration
   const navigate = useNavigate();
   const { registerUser, currentUser, isLoading } = useAuth();
   const [status, setStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
@@ -94,7 +94,7 @@ const RegisterPage = () => {
         values.email, 
         values.password, 
         "", // اسم فارغ 
-        "", // رقم تعريفي فارغ
+        // "", // Removed argument for student_id
         "", // كلية فارغة
         ""  // دفعة فارغة
       );
@@ -108,10 +108,9 @@ const RegisterPage = () => {
       }, 500);
     } catch (error) {
       setStatus("error");
-      uiToast({
-        title: "خطأ في إنشاء الحساب",
+      // Replaced uiToast with toast.error from sonner
+      toast.error("خطأ في إنشاء الحساب", {
         description: error instanceof Error ? error.message : "حدث خطأ غير متوقع",
-        variant: "destructive",
       });
     }
   };

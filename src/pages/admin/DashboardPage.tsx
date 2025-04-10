@@ -2,7 +2,8 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
+import { toast } from "sonner"; // Import sonner toast
 import { useAuth } from "@/contexts/AuthContext";
 import { useProperties } from "@/contexts/PropertiesContext";
 import { useBookings } from "@/contexts/BookingsContext";
@@ -25,8 +26,8 @@ import {
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { currentUser, isLoading: authLoading, signOut } = useAuth();
+  // Removed useToast hook call
+  const { currentUser, isLoading: authLoading, logout } = useAuth(); // Changed signOut to logout
   const { properties, isLoading: propertiesLoading } = useProperties();
   const { bookingRequests, isLoading: bookingsLoading } = useBookings();
 
@@ -37,24 +38,22 @@ const DashboardPage: React.FC = () => {
   // التحقق من صلاحيات المستخدم
   useEffect(() => {
     if (!authLoading && (!currentUser || currentUser.role !== "admin")) {
-      toast({
-        title: "تنبيه الوصول",
+      // Use sonner toast.error
+      toast.error("تنبيه الوصول", {
         description: "ليس لديك صلاحيات للوصول إلى هذه الصفحة",
-        variant: "destructive",
       });
       navigate("/");
     }
-  }, [currentUser, navigate, authLoading, toast]);
+  }, [currentUser, navigate, authLoading]); // Removed toast from dependency array
 
   const handleSignOut = async () => {
     try {
-      await signOut();
+      await logout(); // Changed signOut to logout
       navigate("/");
     } catch (error) {
-      toast({
-        title: "خطأ في تسجيل الخروج",
+      // Use sonner toast.error
+      toast.error("خطأ في تسجيل الخروج", {
         description: "حدث خطأ أثناء تسجيل الخروج. يرجى المحاولة مرة أخرى.",
-        variant: "destructive",
       });
     }
   };
@@ -189,4 +188,4 @@ const DashboardPage: React.FC = () => {
   );
 };
 
-export default DashboardPage; 
+export default DashboardPage;

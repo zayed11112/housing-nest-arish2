@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+// Removed Toaster import from Shadcn UI
+// import { Toaster } from "@/components/ui/toaster"; 
 import HomePage from "./pages/HomePage";
 import SearchPage from "./pages/SearchPage";
 import FavoritesPage from "./pages/FavoritesPage";
@@ -32,8 +34,8 @@ const App = () => (
     <TooltipProvider>
       <ThemeProvider>
         <AppProvider>
-          <Toaster />
-          <Sonner />
+          {/* <Toaster /> Removed Shadcn Toaster */}
+          <Sonner /> {/* Keep Sonner Toaster */}
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -45,7 +47,8 @@ const App = () => (
               <Route path="/property/:id" element={<PropertyDetailsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              <Route path="/chat" element={<ChatPage />} /> {/* Add Chat route */}
+              {/* Updated Chat route to accept optional userId parameter */}
+              <Route path="/chat/:userId?" element={<ChatPage />} /> 
               
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminDashboardPage />} />

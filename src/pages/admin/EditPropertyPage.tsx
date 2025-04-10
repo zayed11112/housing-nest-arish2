@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/components/ui/use-toast";
+// Removed useToast import
+import { toast } from "sonner"; // Import sonner toast
 import { useApp } from "@/contexts/AppContext"; // Use main hook
 import { ArrowLeft, PlusCircle, X, Image as ImageIcon, Upload, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,8 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PropertyStatus, PropertyType, ResidentialUnitType, HousingCategory, AreaType, SpecialPropertyType } from "@/types";
-// Remove direct context import if useApp provides it
-// import { useProperties } from "@/contexts/PropertiesContext"; 
 
 const amenitiesList = [
   "WiFi",
@@ -40,9 +39,8 @@ const imgbbApiKey = "e5ca1f47577dd78e2b024ada3ecb6dd9";
 const EditPropertyPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { toast } = useToast();
-  // Update to use refactored useApp
-  const { auth, properties: propertiesContext } = useApp(); 
+  // Removed useToast hook call
+  const { auth, properties: propertiesContext } = useApp();
   const { currentUser } = auth;
   const { properties, updateProperty } = propertiesContext;
   
@@ -80,48 +78,50 @@ const EditPropertyPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
     
-    console.log("معرف العقار المطلوب تعديله:", id);
-    console.log("نوع معرف العقار:", typeof id);
+    const loadPropertyData = async () => {
+      try {
+        console.log('Fetching property data for ID:', id);
+        const property = await propertiesContext.getPropertyById(id);
+        
+        if (!property) {
+          console.log('Property not found for ID:', id);
+          // Use sonner toast.error
+          toast.error("العقار غير موجود");
+          navigate("/admin/properties");
+          return;
+        }
+        
+        console.log('Found property:', property);
+        setFormData({
+          name: property.name,
+          location: property.location,
+          rooms: property.rooms,
+          beds: property.beds || 1,
+          price: property.price,
+          discount: property.discount || 0,
+          property_type: property.property_type || "شقة",
+          status: property.status || "للإيجار",
+          amenities: property.amenities,
+          images: property.images,
+          description: property.description,
+          available: property.available,
+          residential_unit_type: property.residential_unit_type,
+          housing_category: property.housing_category,
+          area_type: property.area_type,
+          special_property_type: property.special_property_type || 'عادي'
+        });
+      } catch (error) {
+        console.error('Error loading property:', error);
+        // Use sonner toast.error
+        toast.error("خطأ في تحميل بيانات العقار", {
+          description: "حدث خطأ أثناء تحميل بيانات العقار",
+        });
+        navigate("/admin/properties");
+      }
+    };
     
-    // تحويل المعرف إلى نص للتأكد من تطابق نوع البيانات عند المقارنة
-    const propertyId = String(id);
-    
-    // البحث عن العقار باستخدام المعرف النصي
-    const property = properties.find((p) => String(p.id) === propertyId);
-    
-    console.log("العقار الذي تم العثور عليه:", property);
-    
-    if (!property) {
-      toast({
-        title: "العقار غير موجود",
-        description: `لم يتم العثور على عقار بالمعرف: ${id}`,
-        variant: "destructive",
-      });
-      navigate("/admin/properties");
-      return;
-    }
-    
-    setFormData({
-      name: property.name,
-      location: property.location,
-      rooms: property.rooms,
-      beds: property.beds || 1,
-      price: property.price,
-      discount: property.discount || 0,
-      property_type: property.property_type || "شقة",
-      status: property.status || "للإيجار",
-      amenities: property.amenities,
-      images: property.images,
-      description: property.description,
-      available: property.available,
-      residential_unit_type: property.residential_unit_type,
-      housing_category: property.housing_category,
-      area_type: property.area_type,
-      special_property_type: property.special_property_type,
-    });
-    
-    console.log("تم تعيين بيانات النموذج:", formData);
-  }, [id, properties, navigate, toast]);
+    loadPropertyData();
+  }, [id, navigate, propertiesContext]); // Removed toast from dependency array
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -168,19 +168,17 @@ const EditPropertyPage: React.FC = () => {
   
   const handleAddImageUrl = () => {
     if (!imageUrl.trim()) {
-      toast({
-        title: "الرابط فارغ",
+      // Use sonner toast.error
+      toast.error("الرابط فارغ", {
         description: "يرجى إدخال رابط صورة صالح",
-        variant: "destructive",
       });
       return;
     }
     
     if (!imageUrl.match(/^(http|https):\/\/[^ "]+$/)) {
-      toast({
-        title: "رابط غير صالح",
+      // Use sonner toast.error
+      toast.error("رابط غير صالح", {
         description: "يرجى إدخال رابط صورة صالح يبدأ بـ http:// أو https://",
-        variant: "destructive",
       });
       return;
     }
@@ -194,9 +192,8 @@ const EditPropertyPage: React.FC = () => {
     // Reset image URL input
     setImageUrl("");
     
-    toast({
-      title: "تمت إضافة الصورة بنجاح",
-    });
+    // Use sonner toast.success
+    toast.success("تمت إضافة الصورة بنجاح");
   };
   
   const removeImage = (index: number) => {
@@ -233,10 +230,9 @@ const EditPropertyPage: React.FC = () => {
       }
     } catch (error) {
       console.error('خطأ في تحميل الصورة:', error);
-      toast({
-        title: "خطأ في التحميل",
+      // Use sonner toast.error
+      toast.error("خطأ في التحميل", {
         description: error instanceof Error ? error.message : "حدث خطأ غير معروف",
-        variant: "destructive",
       });
       return null;
     } finally {
@@ -252,20 +248,18 @@ const EditPropertyPage: React.FC = () => {
     
     // Check if the file is an image
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "نوع ملف غير مدعوم",
+      // Use sonner toast.error
+      toast.error("نوع ملف غير مدعوم", {
         description: "يرجى اختيار ملف صورة صالح",
-        variant: "destructive",
       });
       return;
     }
     
     // Check if the file size is less than 2MB
     if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: "حجم الملف كبير جدًا",
+      // Use sonner toast.error
+      toast.error("حجم الملف كبير جدًا", {
         description: "يجب أن يكون حجم الصورة أقل من 2 ميجابايت",
-        variant: "destructive",
       });
       return;
     }
@@ -278,9 +272,8 @@ const EditPropertyPage: React.FC = () => {
         images: [...prev.images, imageUrl]
       }));
       
-      toast({
-        title: "تمت إضافة الصورة بنجاح",
-      });
+      // Use sonner toast.success
+      toast.success("تمت إضافة الصورة بنجاح");
     }
     
     // Reset the file input
@@ -293,42 +286,35 @@ const EditPropertyPage: React.FC = () => {
     e.preventDefault();
     if (!id) return;
     
-    console.log("معرف العقار المراد تحديثه:", id);
-    console.log("نوع معرف العقار عند التحديث:", typeof id);
-    
     // التحقق من البيانات المطلوبة
     if (!formData.name.trim()) {
-      toast({
-        title: "اسم العقار مطلوب",
+      // Use sonner toast.error
+      toast.error("اسم العقار مطلوب", {
         description: "يرجى إدخال اسم العقار",
-        variant: "destructive",
       });
       return;
     }
 
     if (!formData.location.trim()) {
-      toast({
-        title: "موقع العقار مطلوب",
+      // Use sonner toast.error
+      toast.error("موقع العقار مطلوب", {
         description: "يرجى إدخال موقع العقار",
-        variant: "destructive",
       });
       return;
     }
 
     if (formData.price <= 0) {
-      toast({
-        title: "السعر غير صحيح",
+      // Use sonner toast.error
+      toast.error("السعر غير صحيح", {
         description: "يجب أن يكون السعر أكبر من صفر",
-        variant: "destructive",
       });
       return;
     }
 
     if (formData.images.length === 0) {
-      toast({
-        title: "الصور مطلوبة",
+      // Use sonner toast.error
+      toast.error("الصور مطلوبة", {
         description: "يرجى إضافة صورة واحدة على الأقل",
-        variant: "destructive",
       });
       return;
     }
@@ -356,33 +342,21 @@ const EditPropertyPage: React.FC = () => {
       };
 
       console.log('بيانات التحديث:', updateData);
+      await updateProperty(id, updateData);
       
-      // تحويل المعرف إلى نص للتأكد من تطابق نوع البيانات
-      const propertyId = String(id);
-      console.log('معرف العقار بعد التحويل إلى نص:', propertyId);
+      // Use sonner toast.success
+      toast.success("تم تحديث العقار بنجاح");
       
-      // محاولة تحديث العقار
-      const success = await updateProperty(propertyId, updateData);
-      
-      if (success) {
-        toast({
-          title: "تم تحديث العقار بنجاح"
-        });
-        
-        // تأخير قليل قبل الانتقال للتأكد من ظهور رسالة النجاح
-        setTimeout(() => {
-          navigate("/admin/properties");
-        }, 500);
-      } else {
-        throw new Error("فشل تحديث العقار لسبب غير معروف");
-      }
+      // تأخير قليل قبل الانتقال للتأكد من ظهور رسالة النجاح
+      setTimeout(() => {
+        navigate("/admin/properties");
+      }, 500);
       
     } catch (error) {
       console.error('خطأ في تحديث العقار:', error);
-      toast({
-        title: "فشل تحديث العقار",
+      // Use sonner toast.error
+      toast.error("فشل تحديث العقار", {
         description: error instanceof Error ? error.message : "حدث خطأ غير متوقع",
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);

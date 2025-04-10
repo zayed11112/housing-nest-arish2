@@ -139,13 +139,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                   </Avatar>
                   <div className="flex flex-col items-center">
                     <span className="font-bold text-base">
-                      {currentUser.name || 'اختيار'}
+                      {currentUser.fullName || currentUser.name || 'مستخدم'} {/* Use fullName as primary */}
                     </span>
-                    {currentUser.student_id && (
-                      <span className={`text-xs ${theme === 'dark' ? 'text-muted-foreground' : 'text-gray-500'}`}>
-                        ID: {currentUser.student_id}
-                      </span>
-                    )}
+                    {/* Removed student_id display as it's not in LocalUser */}
                     {currentUser.role && (
                       <span className={`text-xs mt-1 px-3 py-1 rounded-full ${theme === 'dark' 
                         ? 'bg-indigo-500/20 text-indigo-400' 
@@ -157,11 +153,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 </div>
                 <div className="px-2 space-y-1">
                   {/* Conditional Rendering based on role */}
-                  {currentUser.role === 'admin' ? (
+                  {currentUser.role === 'admin' && (
                     <>
-                      {/* Admin Links */}
                       <DropdownMenuItem className={`cursor-pointer flex items-center justify-center p-2 transition-colors rounded-md focus:bg-transparent ${theme === 'dark' ? 'hover:bg-primary/5' : 'hover:bg-slate-100'}`} 
-                        onClick={() => navigate('/admin/add-property')}>
+                        onClick={() => navigate('/admin/properties/add')}>
                         <div className="flex-none flex items-center justify-center h-10 w-10 rounded-full bg-green-100 text-green-700 ml-3">
                           <PlusSquare className="h-5 w-5" />
                         </div>
@@ -204,7 +199,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         <span className="flex-grow text-center font-medium">💬 الشات</span>
                       </DropdownMenuItem>
                     </>
-                  ) : (
+                  )}
+                  {currentUser.role !== 'admin' && (
                     <>
                       {/* Regular User Links */}
                       <DropdownMenuItem className={`cursor-pointer flex items-center justify-center p-2 transition-colors rounded-md focus:bg-transparent ${theme === 'dark' ? 'hover:bg-primary/5' : 'hover:bg-slate-100'}`} 

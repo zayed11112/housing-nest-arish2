@@ -159,6 +159,14 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       // تحديث واجهة المستخدم أولاً للاستجابة السريعة
       const property = properties.find(p => p.id === propertyId);
+
+      // Check if property exists locally before proceeding
+      if (!property) {
+        console.error(`Property with ID ${propertyId} not found locally.`);
+        toast.error('لم يتم العثور على بيانات العقار.');
+        return; 
+      }
+
       const tempId = `temp-${Date.now()}`;
       
       // إضافة مؤقتة للمفضلة في واجهة المستخدم

@@ -24,12 +24,17 @@ const FloatingChatButton: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  if (!currentUser || currentUser.role === 'admin') {
+  // Hide button only for admin users
+  if (currentUser?.role === 'admin') {
     return null;
   }
 
   const handleClick = () => {
-    navigate('/chat');
+    if (currentUser) {
+      navigate('/chat');
+    } else {
+      navigate('/login'); // Redirect to login if not logged in
+    }
   };
 
   return (
